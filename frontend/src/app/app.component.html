@@ -1,0 +1,363 @@
+<div class="app-container">
+  <!-- Header Bar -->
+  <header class="app-header">
+    <div class="header-logo">
+      <svg class="logo-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+        <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+        <polyline points="14 2 14 8 20 8"></polyline>
+        <line x1="16" y1="13" x2="8" y2="13"></line>
+        <line x1="16" y1="17" x2="8" y2="17"></line>
+        <polyline points="10 9 9 9 8 9"></polyline>
+      </svg>
+      <h1>Requirement Document Analyzer <span class="badge">Agent</span></h1>
+    </div>
+    <div class="header-subtitle">Kaggle AI Agents Intensive Capstone Project</div>
+  </header>
+
+  <!-- Main Content Area -->
+  <main class="main-content">
+    
+    <!-- STATE 1: UPLOAD PAGE -->
+    <div *ngIf="!isAnalyzing && !reportRaw" class="upload-view fade-in">
+      <div class="hero-section">
+        <h2>Multi-Format Requirement Analysis System</h2>
+        <p>Upload your software requirements document (supporting .xlsx, .docx, .txt, and .md). The system uses a dedicated Document MCP Server and Coordinator Agent to analyze changes or full contents, generating implementation guides automatically.</p>
+      </div>
+
+      <div class="upload-card">
+        <div 
+          class="dropzone" 
+          [class.drag-over]="dragOver"
+          (dragover)="onDragOver($event)"
+          (dragleave)="onDragLeave($event)"
+          (drop)="onDrop($event)"
+          (click)="fileInput.click()"
+        >
+          <input 
+            #fileInput 
+            type="file" 
+            style="display: none" 
+            accept=".xlsx, .docx, .txt, .md"
+            (change)="onFileSelected($event)"
+          >
+          
+          <div class="dropzone-content">
+            <div class="icon-circle">
+              <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="1.5">
+                <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+                <polyline points="17 8 12 3 7 8"></polyline>
+                <line x1="12" y1="3" x2="12" y2="15"></line>
+              </svg>
+            </div>
+            <h3>Drag & Drop document here</h3>
+            <p>Supported: .xlsx, .docx, .txt, .md</p>
+            <button class="btn btn-secondary">Browse Files</button>
+          </div>
+        </div>
+
+        <!-- Settings Group (NEW / UPDATE) -->
+        <div class="settings-card">
+          <div class="settings-title">Analysis Configuration</div>
+          <div class="settings-form">
+            <div class="form-group">
+              <label for="requirementType">Requirement Analysis Mode</label>
+              <select 
+                id="requirementType" 
+                class="select-dropdown" 
+                (change)="requirementType = $any($event.target).value"
+              >
+                <option value="UPDATE" [selected]="requirementType === 'UPDATE'">
+                  UPDATE Mode - Focus on modified/yellow-highlighted parts
+                </option>
+                <option value="NEW" [selected]="requirementType === 'NEW'">
+                  NEW Mode - Analyze the entire document content
+                </option>
+              </select>
+              <div class="form-hint">
+                <span *ngIf="requirementType === 'UPDATE'">
+                  * Highlights required for .xlsx and .docx. Txt/Md documents will analyze full content.
+                </span>
+                <span *ngIf="requirementType === 'NEW'">
+                  * Parses full content. Yellow highlights are not required.
+                </span>
+              </div>
+            </div>
+          </div>
+        </div>
+
+        <!-- Selected File Status -->
+        <div *ngIf="activeFile" class="file-status-bar fade-in">
+          <div class="file-details">
+            <svg class="excel-icon" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M14 2H6a2 2 0 0 0-2 2v16a2 2 0 0 0 2 2h12a2 2 0 0 0 2-2V8z"></path>
+              <polyline points="14 2 14 8 20 8"></polyline>
+            </svg>
+            <div class="file-meta">
+              <span class="file-name">{{ activeFile.name }}</span>
+              <span class="file-size">{{ (activeFile.size / 1024).toFixed(1) }} KB</span>
+            </div>
+          </div>
+          <button class="remove-btn" (click)="removeFile()" title="Remove file">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="18" y1="6" x2="6" y2="18"></line>
+              <line x1="6" y1="6" x2="18" y2="18"></line>
+            </svg>
+          </button>
+        </div>
+
+        <!-- Error Notification -->
+        <div *ngIf="errorMessage" class="error-banner fade-in">
+          <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+            <circle cx="12" cy="12" r="10"></circle>
+            <line x1="12" y1="8" x2="12" y2="12"></line>
+            <line x1="12" y1="16" x2="12.01" y2="16"></line>
+          </svg>
+          <span>{{ errorMessage }}</span>
+        </div>
+
+        <!-- Action Button -->
+        <div class="action-footer">
+          <button 
+            [disabled]="!activeFile" 
+            class="btn btn-primary btn-large" 
+            (click)="analyzeFile()"
+          >
+            Start Multi-Agent Analysis
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <polyline points="9 18 15 12 9 6"></polyline>
+            </svg>
+          </button>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATE 2: ANALYZING PAGE -->
+    <div *ngIf="isAnalyzing" class="analyzing-view fade-in">
+      <div class="processing-card">
+        <div class="spinner-glow">
+          <div class="circle-loader"></div>
+          <div class="pulsing-core"></div>
+        </div>
+
+        <h2>Orchestrating Agents...</h2>
+        <p class="step-subtext">{{ progressSteps[progressStepIndex].sublabel }}</p>
+
+        <!-- Progress Bar -->
+        <div class="progress-container">
+          <div class="progress-bar" [style.width.%]="progressPercentage"></div>
+        </div>
+        <div class="progress-percentage">{{ progressPercentage }}%</div>
+
+        <!-- Agent Workflow Timeline -->
+        <div class="pipeline-timeline">
+          <div 
+            *ngFor="let step of progressSteps; let i = index" 
+            class="timeline-item"
+            [class.active]="i === progressStepIndex"
+            [class.completed]="i < progressStepIndex"
+          >
+            <div class="timeline-dot">
+              <span *ngIf="i >= progressStepIndex">{{ i + 1 }}</span>
+              <svg *ngIf="i < progressStepIndex" viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="3">
+                <polyline points="20 6 9 17 4 12"></polyline>
+              </svg>
+            </div>
+            <div class="timeline-content">
+              <h4>{{ step.label }}</h4>
+              <p>{{ step.sublabel }}</p>
+            </div>
+          </div>
+        </div>
+      </div>
+    </div>
+
+    <!-- STATE 3: RESULTS PAGE -->
+    <div *ngIf="!isAnalyzing && reportRaw" class="result-view fade-in">
+      
+      <!-- Top Action Ribbon -->
+      <div class="result-ribbon">
+        <div class="ribbon-left">
+          <button class="btn btn-back" (click)="reset()">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <line x1="19" y1="12" x2="5" y2="12"></line>
+              <polyline points="12 19 5 12 12 5"></polyline>
+            </svg>
+            Analyze Another Document
+          </button>
+          <div class="source-info">
+            <span class="info-label">Analyzed File:</span>
+            <span class="info-value">{{ fileName }}</span>
+          </div>
+          
+          <!-- Document type & highlight metadata badges -->
+          <div class="metadata-badges">
+            <span class="meta-badge format-badge">{{ documentType }}</span>
+            <span class="meta-badge highlight-badge" [class.detected]="highlightsDetected">
+              Highlights: {{ highlightsDetected ? 'Detected' : 'None / NA' }}
+            </span>
+            <span class="meta-badge mode-badge">{{ requirementType }}</span>
+          </div>
+        </div>
+        
+        <div class="ribbon-right">
+          <a *ngIf="downloadHref" [href]="downloadHref" [download]="fileName + '_Report.md'" class="btn btn-primary btn-download">
+            <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+              <path d="M21 15v4a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2v-4"></path>
+              <polyline points="7 10 12 15 17 10"></polyline>
+              <line x1="12" y1="15" x2="12" y2="3"></line>
+            </svg>
+            Download Markdown (.md)
+          </a>
+        </div>
+      </div>
+
+      <!-- Tabbed Section Wrapper -->
+      <div class="result-grid">
+        <!-- Sidebar Navigation -->
+        <aside class="result-sidebar">
+          <nav class="tab-navigation">
+            <button 
+              class="tab-btn" 
+              [class.active]="selectedTab === 'summary'"
+              (click)="selectedTab = 'summary'"
+            >
+              <div class="tab-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M4 15s1-1 4-1 5 2 8 2 4-1 4-1V3s-1 1-4 1-5-2-8-2-4 1-4 1z"></path>
+                  <line x1="4" y1="22" x2="4" y2="15"></line>
+                </svg>
+              </div>
+              <div class="tab-meta">
+                <span class="tab-title">Requirement Summary</span>
+                <span class="tab-desc">Overview of changes</span>
+              </div>
+            </button>
+
+            <button 
+              class="tab-btn" 
+              [class.active]="selectedTab === 'rules'"
+              (click)="selectedTab = 'rules'"
+            >
+              <div class="tab-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 2L2 7l10 5 10-5-10-5z"></path>
+                  <path d="M2 17l10 5 10-5"></path>
+                  <path d="M2 12l10 5 10-5"></path>
+                </svg>
+              </div>
+              <div class="tab-meta">
+                <span class="tab-title">Business Rules</span>
+                <span class="tab-desc">Extracted logic</span>
+              </div>
+            </button>
+
+            <button 
+              class="tab-btn" 
+              [class.active]="selectedTab === 'impact'"
+              (click)="selectedTab = 'impact'"
+            >
+              <div class="tab-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <rect x="2" y="3" width="20" height="14" rx="2" ry="2"></rect>
+                  <line x1="8" y1="21" x2="16" y2="21"></line>
+                  <line x1="12" y1="17" x2="12" y2="21"></line>
+                </svg>
+              </div>
+              <div class="tab-meta">
+                <span class="tab-title">Impact Analysis</span>
+                <span class="tab-desc">Architecture assessment</span>
+              </div>
+            </button>
+
+            <button 
+              class="tab-btn" 
+              [class.active]="selectedTab === 'tasks'"
+              (click)="selectedTab = 'tasks'"
+            >
+              <div class="tab-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="9 11 12 14 22 4"></polyline>
+                  <path d="M21 12v7a2 2 0 0 1-2 2H5a2 2 0 0 1-2-2V5a2 2 0 0 1 2-2h11"></path>
+                </svg>
+              </div>
+              <div class="tab-meta">
+                <span class="tab-title">Development Tasks</span>
+                <span class="tab-desc">Frontend & Backend code</span>
+              </div>
+            </button>
+
+            <button 
+              class="tab-btn" 
+              [class.active]="selectedTab === 'testcases'"
+              (click)="selectedTab = 'testcases'"
+            >
+              <div class="tab-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <path d="M12 22c5.523 0 10-4.477 10-10S17.523 2 12 2 2 6.477 2 12s4.477 10 10 10z"></path>
+                  <path d="M22 12h-4M4 12H0M12 2v4M12 18v4"></path>
+                </svg>
+              </div>
+              <div class="tab-meta">
+                <span class="tab-title">Test Cases</span>
+                <span class="tab-desc">QA verification checklist</span>
+              </div>
+            </button>
+
+            <!-- Execution Trace Console Tab -->
+            <button 
+              class="tab-btn trace-tab-btn" 
+              [class.active]="selectedTab === 'trace'"
+              (click)="selectedTab = 'trace'"
+            >
+              <div class="tab-icon">
+                <svg viewBox="0 0 24 24" fill="none" stroke="currentColor" stroke-width="2">
+                  <polyline points="4 17 10 11 4 5"></polyline>
+                  <line x1="12" y1="19" x2="20" y2="19"></line>
+                </svg>
+              </div>
+              <div class="tab-meta">
+                <span class="tab-title">Agent Execution Trace</span>
+                <span class="tab-desc">System logs & tracing</span>
+              </div>
+            </button>
+          </nav>
+        </aside>
+
+        <!-- Main Output Rendering Panel -->
+        <article class="result-content-card">
+          <div class="card-header">
+            <h2 *ngIf="selectedTab === 'summary'">Requirement Summary</h2>
+            <h2 *ngIf="selectedTab === 'rules'">Business Rules</h2>
+            <h2 *ngIf="selectedTab === 'impact'">Impact Analysis</h2>
+            <h2 *ngIf="selectedTab === 'tasks'">Development Tasks</h2>
+            <h2 *ngIf="selectedTab === 'testcases'">Test Cases</h2>
+            <h2 *ngIf="selectedTab === 'trace'">Agent Execution Trace</h2>
+          </div>
+          
+          <div class="card-body">
+            <!-- Normal Markdown contents -->
+            <div *ngIf="selectedTab !== 'trace'" class="markdown-container" [innerHTML]="getSafeHtml(sections[selectedTab])">
+            </div>
+            
+            <!-- Agent Trace logs console -->
+            <div *ngIf="selectedTab === 'trace'" class="trace-console">
+              <div class="trace-header">
+                <span class="console-title">agent-session-logger:~# cat execution.trace</span>
+                <button class="console-copy-btn" (click)="reset()" title="Reset session">Reset Session</button>
+              </div>
+              <div class="trace-body">
+                <div *ngFor="let log of agentTrace" class="trace-log-line">
+                  <span class="trace-chevron">&gt;</span> {{ log }}
+                </div>
+                <div class="trace-log-line cursor-line">
+                  <span class="trace-chevron">&gt;</span> <span class="blinking-cursor">_</span>
+                </div>
+              </div>
+            </div>
+          </div>
+        </article>
+      </div>
+
+    </div>
+  </main>
+</div>

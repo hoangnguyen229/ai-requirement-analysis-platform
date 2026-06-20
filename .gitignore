@@ -1,0 +1,42 @@
+# Node.js portable distribution
+node-dist/
+
+# Frontend dependencies and builds
+frontend/node_modules/
+frontend/dist/
+frontend/.angular/
+frontend/tmp/
+frontend/out-tsc/
+frontend/.vscode/
+
+# Backend dependencies and builds
+backend/target/
+backend/.idea/
+backend/*.iml
+
+# Application configuration / secrets
+.env
+backend/.env
+frontend/.env
+*.env
+
+# Local test requirements and generated reports
+test_requirements.xlsx
+test_requirements.docx
+test_requirements.txt
+test_requirements.md
+test_requirements.xlsx_Report*.md
+dummy.xls
+
+# IDE files
+.idea/
+.vscode/
+*.suo
+*.ntvs*
+*.njsproj
+*.sln
+*.sw?
+
+# OS files
+.DS_Store
+Thumbs.db
