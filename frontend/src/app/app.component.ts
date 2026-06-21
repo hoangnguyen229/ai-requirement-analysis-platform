@@ -123,7 +123,7 @@ export class AppComponent {
         this.progressStepIndex++;
         this.progressPercentage = Math.min((this.progressStepIndex + 1) * 15, 90);
       }
-    }, 2500);
+    }, 3500);
 
     // Make API Call
     this.http.post<any>('/api/analyze', formData).subscribe({
