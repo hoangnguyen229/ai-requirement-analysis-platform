@@ -75,8 +75,14 @@ The application strictly isolates document parsing from LLM orchestrators using 
 
 ### 🚀 Deployability
 - **Single Deployable Unit**: The compiled production build of the Angular frontend is bundled directly into the Spring Boot static classpath (`src/main/resources/static`).
-- **Single Running Port**: Both the API, MCP RPC server, and Angular UI are served from port `8080`, eliminating CORS configurations and multiple container dependencies.
-- **Stateless & Database-free**: The analyzer operates in-memory on uploaded multipart files, allowing immediate deployment to serverless platforms like **Render**, **Heroku**, or **Fly.io** as a single JAR.
+- **Single Running Port**: Both the API, MCP RPC server, and Angular UI are served from a single port, eliminating CORS configurations and multiple container dependencies.
+- **Dynamic Port Binding**: The application binds dynamically to the port specified by the `PORT` environment variable (defaulting to `8080`), configured in [application.properties](ai-requirement-analysis-platform/backend/src/main/resources/application.properties) to support serverless platforms like Render.
+- **Docker Container Support**: Supported by a multi-stage [Dockerfile](ai-requirement-analysis-platform/Dockerfile) and [.dockerignore](ai-requirement-analysis-platform/.dockerignore) to build the Angular frontend, copy it to the Spring static resource directory, compile the Java application, and produce a production JRE alpine image.
+- **Stateless & Database-free**: The analyzer operates in-memory on uploaded multipart files, allowing immediate deployment to serverless platforms.
+
+### 🛡️ Resilience & API Stability
+- **Exponential Backoff with Jitter**: Implemented in [GeminiService.java](ai-requirement-analysis-platform/backend/src/main/java/com/example/excelanalyzer/mcp/GeminiService.java) to automatically retry up to 5 times for transient failures when calling the Google Gemini API (such as HTTP `429 Too Many Requests`, `500 Internal Server Error`, `503 Service Unavailable`, `504 Gateway Timeout`, or network connection/resource access timeouts).
+- **Jittered Backoff Intervals**: Retries are spaced using exponential delays with added randomized jitter to prevent thundering herd situations.
 
 ---
 
@@ -93,25 +99,54 @@ To compile and run the application locally, you will need:
 ## 5. Quick Start Guide
 
 ### Step 1: Clone and Configure Environment
-Set up your Gemini API Key. The application is configured to read the key from either:
-- The `GEMINI_API_KEY` system environment variable.
-- A local `.env` file in the root directory (automatically excluded from Git tracking for security):
-  ```env
-  GEMINI_API_KEY=AIzaSyYourGeminiApiKeyHere...
+Set up your Gemini API Key. The application is configured to read the key from the `GEMINI_API_KEY` system environment variable:
+- **On Windows (PowerShell)**:
+  ```powershell
+  $env:GEMINI_API_KEY="your_gemini_api_key"
+  ```
+- **On Linux / macOS**:
+  ```bash
+  export GEMINI_API_KEY="your_gemini_api_key"
   ```
 
 ### Step 2: Build the Combined Application
-Run the bundled PowerShell automation script from the repository root. This script automatically builds the Angular app, copies static assets into the Spring Boot directory, and compiles the backend into a runnable fat JAR:
-```powershell
-PowerShell -ExecutionPolicy Bypass -File .\build-app.ps1
-```
+Build the Angular frontend and compile the Spring Boot backend into a runnable fat JAR:
+- **On Windows (PowerShell)**:
+  Run the bundled PowerShell automation script [build-app.ps1](ai-requirement-analysis-platform/build-app.ps1):
+  ```powershell
+  PowerShell -ExecutionPolicy Bypass -File .\build-app.ps1
+  ```
+- **On Linux / macOS / Bash**:
+  Run the Bash build script [build.sh](ai-requirement-analysis-platform/build.sh):
+  ```bash
+  chmod +x build.sh
+  ./build.sh
+  ```
 
 ### Step 3: Run the Executable JAR
 Execute the packaged JAR using Java 21:
-```powershell
-java -jar backend/target/excel-analyzer-0.0.1-SNAPSHOT.jar
-```
-The application will launch on: **`http://localhost:8080/`**
+- **Using Helper Script (Windows / PowerShell)**:
+  You can run the local execution script [run-local.ps1](ai-requirement-analysis-platform/run-local.ps1):
+  ```powershell
+  .\run-local.ps1
+  ```
+- **Direct Command Line**:
+  ```bash
+  java -jar backend/target/excel-analyzer-0.0.1-SNAPSHOT.jar
+  ```
+The application will launch on: **`http://localhost:8080/`** (or the port specified by the `PORT` environment variable).
+
+### Step 4: Build and Run via Docker (Optional)
+To package and run the application inside a local Docker container:
+1. Build the Docker image:
+   ```bash
+   docker build -t requirement-document-analyzer .
+   ```
+2. Run the Docker container:
+   ```bash
+   docker run -p 8080:8080 -e GEMINI_API_KEY="your_gemini_api_key" requirement-document-analyzer
+   ```
+The application will be accessible at: **`http://localhost:8080/`**
 
 ---
 
@@ -136,3 +171,11 @@ We have provided programmatic generators inside the test directory. You can run 
 4. **Markdown UPDATE Mode**: Upload `test_requirements.md` in **UPDATE** mode. Verify that the analysis runs, lists format-specific limitations, and places *"Highlight detection is unavailable for plain text/markdown files"* inside the *Clarifications Needed* tab.
 5. **Excel NEW Mode**: Upload `test_requirements.xlsx` in **NEW** mode. Verify that the agent bypasses highlights and structures a full implementation report for the entire document scope.
 6. **Execution Trace Verification**: After running an analysis, click on the **Agent Execution Trace** tab. Check the terminal-styled console logs to verify the sequential steps taken by the Coordinator Agent, the tool executions on the MCP server, and responses from the agents.
+
+---
+
+## 7. Deployment
+
+For cloud and production environments, the application is designed to be fully containerized.
+
+- Refer to the [Render Deployment Guide](ai-requirement-analysis-platform/docs/deployment.md) in the `docs/deployment.md` file for details on deploying the containerized application on **Render**.
