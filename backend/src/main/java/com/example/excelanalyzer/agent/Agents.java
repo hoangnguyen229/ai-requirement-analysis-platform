@@ -2,12 +2,17 @@ package com.example.excelanalyzer.agent;
 
 import com.example.excelanalyzer.mcp.GeminiService;
 import com.example.excelanalyzer.mcp.McpClientService;
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+import org.springframework.beans.factory.annotation.Value;
 import org.springframework.stereotype.Service;
 
 import java.util.*;
 
 @Service
 public class Agents {
+
+    private static final Logger logger = LoggerFactory.getLogger(Agents.class);
 
     private final McpClientService mcpClient;
     private final GeminiService geminiService;
@@ -132,11 +137,14 @@ public class Agents {
         private final McpClientService mcpClient;
         private final RequirementAgent requirementAgent;
         private final TaskAgent taskAgent;
+        private final long interAgentDelayMs;
 
-        public CoordinatorAgent(McpClientService mcpClient, RequirementAgent requirementAgent, TaskAgent taskAgent) {
+        public CoordinatorAgent(McpClientService mcpClient, RequirementAgent requirementAgent, TaskAgent taskAgent,
+                                @Value("${gemini.inter-agent-delay-ms:2000}") long interAgentDelayMs) {
             this.mcpClient = mcpClient;
             this.requirementAgent = requirementAgent;
             this.taskAgent = taskAgent;
+            this.interAgentDelayMs = interAgentDelayMs;
         }
 
         public AnalysisResult orchestrate(String filePath, String requirementType) throws Exception {
@@ -198,6 +206,14 @@ public class Agents {
             String requirementReport = requirementAgent.analyze(rawPayload, requirementType, docType);
             trace.add(String.format("%s [RequirementAgent] Summarization and business rule extraction completed.", 
                     java.time.LocalTime.now().toString().substring(0, 8)));
+
+            // 4.5. Inter-agent delay to avoid Gemini API rate limits (burst prevention)
+            if (interAgentDelayMs > 0) {
+                trace.add(String.format("%s [Coordinator] Applying inter-agent rate limit delay (%dms) before TaskAgent...",
+                        java.time.LocalTime.now().toString().substring(0, 8), interAgentDelayMs));
+                logger.info("Inter-agent delay: waiting {}ms before TaskAgent call to avoid rate limits", interAgentDelayMs);
+                Thread.sleep(interAgentDelayMs);
+            }
 
             // 5. Invoke Task Agent
             trace.add(String.format("%s [TaskAgent] Generating technical impact analysis, developer tasks, and test cases...", 
